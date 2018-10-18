@@ -1,6 +1,6 @@
 //Init
 const settings = {
-  search:         'квартиры в Одессе', //What will you look for
+  search:         'курсы angualr', //What will you look for
   region:         'ZZ',     //Which region is selected
   countOfPages:    100       //How many pages do you need
 }
@@ -32,7 +32,7 @@ function filterArray(arr) {
 
   return arr.filter(obj => {			
         
-    return !uniq[obj.Emails] && (uniq[obj.Emails] = true);
+    return !uniq[obj.Domain] && (uniq[obj.Domain] = true);
         
   });
 }
@@ -157,30 +157,21 @@ async function makeСhoice(regionInitials, page) {
   const nowMinutes = testZero( now.getMinutes() );
   const nowSeconds = testZero( now.getSeconds() );
 
-  const time = {
-    date: nowDate,
-    month: nowMonth,
-    year:  nowYear,
-    hours: nowHours,
-    minutes: nowMinutes,
-    seconds: nowSeconds  
-  }
-
-  const nameOfFile =  `${settings.search}-${time.date}${time.month}${time.year}${time.hours}${time.minutes}${time.seconds}`;
-
+  const nameOfFile = `${settings.search}-${nowDate}${nowMonth}${nowYear}${nowHours}${nowMinutes}${nowSeconds}`;
 
   //Create unfiltered file
-  await fs.appendFile(`${nameOfFile}.xls`, `Domain\t Emails\n`);
+  await fs.appendFile(`${nameOfFile}.xls`, `Domain\n`);
 
-  
   //Selectors
   // #rso > div:nth-child(1) > div > div:nth-child(7) > div > div > div.r > a
-  const linksWithoutAdsSelector = 'div > div > div > div.r > a'; 
+  const linksWithoutAdsSelector = '.r > a'; 
 
   // #tads > ol > li > div.ad_cclk  
-  const linksWithAdsSelector = 'div.ad_cclk > .V0MxL';
+  const linksWithAdsSelector = '.ad_cclk > .V0MxL';
 
-  const emailSelector = '[href^="mailto"]';
+  //Selectors for finding
+  const nameEmailSelector = '[name=email]';
+  const namePhoneSelector = '[name=phone]';
 
 
   //How many pages U need (countOfPages);
@@ -190,9 +181,8 @@ async function makeСhoice(regionInitials, page) {
 
     //Arrays for links and email
     let arrAllLinks = [];
-    let arrAllEmail = [];
 
-    await pageFirst.waitFor(1500);
+    await pageFirst.waitFor(1000);
     
     const arrLinksWithoutAdsOfPage = await pageFirst.$$eval(linksWithoutAdsSelector, nodes => nodes.map(n => n.href));
     await pushIntoArray(arrLinksWithoutAdsOfPage, arrAllLinks);
@@ -200,10 +190,8 @@ async function makeСhoice(regionInitials, page) {
     const arrLinksWithAdsOfPage = await pageFirst.$$eval(linksWithAdsSelector, nodes => nodes.map(n => n.href));
     await pushIntoArray(arrLinksWithAdsOfPage, arrAllLinks);
 
-
     //How many links in array
     console.log(arrAllLinks);
-
 
     //Flatting array
     arrAllLinks = await flatArray(arrAllLinks);
@@ -218,50 +206,38 @@ async function makeСhoice(regionInitials, page) {
           // timeout: 30000
         });
   
-        const arrAllEmailsOfPage = await pageSecond.$$eval(emailSelector, nodes => nodes.map(n => n.href));
+        const arrAllEmailsName = await pageSecond.$$eval(nameEmailSelector, nodes => nodes.map(n => n.name));
+        const arrAllPhoneName = await pageSecond.$$eval(namePhoneSelector, nodes => nodes.map(n => n.name));
   
-        console.log(linkHref, arrAllEmailsOfPage);
+        console.log(linkHref, arrAllEmailsName);
+        console.log(linkHref, arrAllPhoneName);
 
-        if(arrAllEmailsOfPage.length) {
-
-          // Delete 'mailto:' && '?'
-          arrAllEmail = await deleteStrings(arrAllEmailsOfPage);
-          console.log(`\n////////// Delete 'mailto:' && '?'//////////\n\n`, arrAllEmail);
-
-          //Delete repeated elements in array
-          arrAllEmail = await noRepeatArray(arrAllEmail);
-          console.log(`\n////////// Delete repeated elements in array//////////\n\n`, arrAllEmail);
+        if( arrAllEmailsName.length || arrAllPhoneName.length ) {
 
           //Create object
-          const obj = {domain: linkHref, emails: arrAllEmail};
-          console.log(`\n////////// Create obj //////////\n\n`, obj);
+          const obj = {domain: linkHref};
+          console.log('\n////////// Create obj //////////\n\n', obj);     
 
           //Append to unfiltered
-          await fs.appendFile(`${nameOfFile}.xls`, `${obj.domain}\t${obj.emails.join(', ')}\n`);
-
-          console.log(`\n////////// Append to unfiltered file //////////\n\n`, `${obj.domain}\t${obj.emails.join(', ')}\n`);
+          await fs.appendFile(`${nameOfFile}.xls`, `${obj.domain}\n`);
+          console.log('\n////////// Append to unfiltered file //////////\n\n', `${obj.domain}\n`);
         }
       }
   
       catch (error) {
-        // console.log('\nEnter in block catch(error)\n');
-
         const errorSiteBanned = 'ERR_CONNECTION_REFUSED';
         const errorInternetDisconnect = 'ERR_INTERNET_DISCONNECTED';
 
         const spaceErrorMessage = error.message.indexOf(' ');
-
         const stringErrorMessage = error.message.slice(5, spaceErrorMessage);
 
         // console.log('stringErrorMessage ===>', stringErrorMessage );
-
-        // console.log(  stringErrorMessage == errorSiteBanned  );
-
-        // console.log(  stringErrorMessage == errorInternetDisconnect  );
-
+        // console.log(stringErrorMessage == errorSiteBanned);
+        // console.log(stringErrorMessage == errorInternetDisconnect);
 
         if (error instanceof TimeoutError) {
-          console.log('\nTimeoutError ===>', linkHref);
+          console.log('\nTimeoutError ===>\n', linkHref);
+
           await pageSecond.goForward(linkHref, {
             waitUntil: ['networkidle0', 'domcontentloaded']
             // timeout: 30000
@@ -270,7 +246,7 @@ async function makeСhoice(regionInitials, page) {
 
         else if( stringErrorMessage == errorSiteBanned ) {
           // console.log('errorSiteBanned');
-          console.log(`\n////////// Site Banned! //////////\n\n`);
+          console.log('\n////////// Site Banned! //////////\n', linkHref);
 
           await pageSecond.goForward(linkHref, {
             waitUntil: ['networkidle0', 'domcontentloaded']
@@ -282,34 +258,33 @@ async function makeСhoice(regionInitials, page) {
         else if( stringErrorMessage == errorInternetDisconnect ) {
           // console.log(error.message);
           // console.log('errorInternetDisconnect');
-        
-          console.log(`\n////////// Internet disconnected! //////////\n`);
 
-          let timer = setTimeout(function tick() {
+          // console.log(stringErrorMessage == errorInternetDisconnect);
+        
+          console.log('\n////////// Internet disconnected! //////////\n');
+
+          let secondsWithoutInternet = 0;
+          const timerDelay = 2000;
+
+          let timer = setInterval(() => {
             console.log('\n////////// There is no internet yet... Refreshing page... //////////\n');
 
-            pageSecond.reload({
-              waitUntil: ['networkidle0', 'domcontentloaded']
-              // timeout: 30000
-            });
+            pageFirst.reload( {timeout: 0} );
+            pageSecond.reload( {timeout: 0} );
 
-            timer = setTimeout(tick, 3000);
-
-          }, 3000);
-
+            console.log(secondsWithoutInternet = secondsWithoutInternet + (timerDelay/1000), 'sec');
+          }, timerDelay);
+          
           console.log('Wait For Response of ===>', linkHref);
           const response = await pageSecond.waitForResponse(linkHref, { timeout: 0 });
 
-
           if( response.ok() ) {
-            clearTimeout(timer);
+            clearInterval(timer);
             console.log('\n////////// Clear Timer //////////\n`');
-            console.log(`\n////////// Internet enabled! //////////\n`);
+            console.log('\n////////// Internet enabled! //////////\n');
             console.log('\n////////// Current link //////////\n\n', linkHref);
-
             arrAllLinks.push(linkHref);
-
-            console.log('\n////////// Add "push()" current link in array //////////\n\n', linkHref);
+            console.log('\n////////// Add "push()" current link in array "arrAllLinks" //////////\n\n', linkHref);
             console.log('\n////////// Now array looks like //////////\n\n', arrAllLinks);
           }
         }
@@ -317,23 +292,19 @@ async function makeСhoice(regionInitials, page) {
     };
       
     try {
-  
       if(i < settings.countOfPages) {
         await pageFirst.click(`a[aria-label="Page ${++j}"]`);
       }
-
     }
-
     catch (error) {
       console.log(`\n////////// I can't turn the page ===> "Page ${++j}" //////////\n\n`);
       break;
     }
-
   }
 
 
   //Parse unfiltered
-  console.log(`\n////////// Parse unfiltered file //////////\n\n`);   
+  console.log('\n////////// Parse unfiltered file //////////\n\n');   
 
   await node_xj({
     input: `${nameOfFile}.xls`,  // input xls
@@ -347,19 +318,19 @@ async function makeСhoice(regionInitials, page) {
       const arrFiltered = filterArray(result); 
       console.log('\n////////// Filter //////////\n\n', arrFiltered);
 
-      fs.writeFile(`${nameOfFile}.xls`, `Domain\t Emails\n`);
+      fs.writeFile(`${nameOfFile}.xls`, 'Domain\n');
     
       arrFiltered.forEach(obj => {
-        fs.appendFile(`${nameOfFile}.xls`, `${obj.Domain}\t ${obj.Emails}\n`);
+        fs.appendFile(`${nameOfFile}.xls`, `${obj.Domain}\n`);
       });
 
-      console.log(`\n////////// Filter completed! //////////\n\n`);
+      console.log('\n////////// Filter completed! //////////\n\n');
     }
   });
 
   await browser.close();
 
-  console.log(`\n////////// Browser closed! //////////\n\n`);
+  console.log('\n////////// Browser closed! //////////\n\n');
 
   await fs.unlink(`${nameOfFile}.json`, (err) => {
     if (err) throw err;
