@@ -1,6 +1,6 @@
 //Init
 const settings = {
-  search:         'курсы angualr', //What will you look for
+  search:         'Квартиры', //What will you look for
   region:         'ZZ',     //Which region is selected
   countOfPages:    100       //How many pages do you need
 }
@@ -145,7 +145,7 @@ async function makeСhoice(regionInitials, page) {
   const userKeyPress = 'Enter';
   await pageFirst.keyboard.press(userKeyPress);
 
-  await pageFirst.waitFor(1000);
+  await pageFirst.waitFor(1500);
 
 
   //Create name of file
@@ -164,10 +164,13 @@ async function makeСhoice(regionInitials, page) {
 
   //Selectors
   // #rso > div:nth-child(1) > div > div:nth-child(7) > div > div > div.r > a
-  const linksWithoutAdsSelector = '.r > a'; 
+  const linksWithoutAdsSelector = 'div.r > a:first-of-type';
 
   // #tads > ol > li > div.ad_cclk  
   const linksWithAdsSelector = '.ad_cclk > .V0MxL';
+
+  // #nav > tbody > tr > td > a
+  const googlePageNav = '#nav > tbody > tr > td > a';
 
   //Selectors for finding
   const nameEmailSelector = '[name=email]';
@@ -182,7 +185,8 @@ async function makeСhoice(regionInitials, page) {
     //Arrays for links and email
     let arrAllLinks = [];
 
-    await pageFirst.waitFor(1000);
+    await pageFirst.waitFor(1500);
+    await pageFirst.waitForSelector(googlePageNav);
     
     const arrLinksWithoutAdsOfPage = await pageFirst.$$eval(linksWithoutAdsSelector, nodes => nodes.map(n => n.href));
     await pushIntoArray(arrLinksWithoutAdsOfPage, arrAllLinks);
@@ -227,7 +231,6 @@ async function makeСhoice(regionInitials, page) {
       catch (error) {
         const errorSiteBanned = 'ERR_CONNECTION_REFUSED';
         const errorInternetDisconnect = 'ERR_INTERNET_DISCONNECTED';
-
         const spaceErrorMessage = error.message.indexOf(' ');
         const stringErrorMessage = error.message.slice(5, spaceErrorMessage);
 
@@ -247,18 +250,12 @@ async function makeСhoice(regionInitials, page) {
         else if( stringErrorMessage == errorSiteBanned ) {
           // console.log('errorSiteBanned');
           console.log('\n////////// Site Banned! //////////\n', linkHref);
-
-          await pageSecond.goForward(linkHref, {
-            waitUntil: ['networkidle0', 'domcontentloaded']
-            // timeout: 30000
-          });
-
+          await pageSecond.goForward(linkHref, {timeout: 1000});
         }
 
         else if( stringErrorMessage == errorInternetDisconnect ) {
           // console.log(error.message);
           // console.log('errorInternetDisconnect');
-
           // console.log(stringErrorMessage == errorInternetDisconnect);
         
           console.log('\n////////// Internet disconnected! //////////\n');
@@ -269,21 +266,23 @@ async function makeСhoice(regionInitials, page) {
           let timer = setInterval(() => {
             console.log('\n////////// There is no internet yet... Refreshing page... //////////\n');
 
-            pageFirst.reload( {timeout: 0} );
-            pageSecond.reload( {timeout: 0} );
+            secondsWithoutInternet = secondsWithoutInternet + (timerDelay/1000);
+            console.log(`${secondsWithoutInternet} sec`);
 
-            console.log(secondsWithoutInternet = secondsWithoutInternet + (timerDelay/1000), 'sec');
+            pageSecond.reload( {timeout: 0} );
           }, timerDelay);
           
           console.log('Wait For Response of ===>', linkHref);
-          const response = await pageSecond.waitForResponse(linkHref, { timeout: 0 });
+          const responseSecond = await pageSecond.waitForResponse(linkHref, { timeout: 0 });
 
-          if( response.ok() ) {
+          if( responseSecond.ok() ) {
             clearInterval(timer);
             console.log('\n////////// Clear Timer //////////\n`');
             console.log('\n////////// Internet enabled! //////////\n');
             console.log('\n////////// Current link //////////\n\n', linkHref);
+
             arrAllLinks.push(linkHref);
+
             console.log('\n////////// Add "push()" current link in array "arrAllLinks" //////////\n\n', linkHref);
             console.log('\n////////// Now array looks like //////////\n\n', arrAllLinks);
           }
@@ -297,7 +296,7 @@ async function makeСhoice(regionInitials, page) {
       }
     }
     catch (error) {
-      console.log(`\n////////// I can't turn the page ===> "Page ${++j}" //////////\n\n`);
+      console.log(`\n////////// I can't turn the page ===> "Page ${j}" //////////\n\n`);
       break;
     }
   }
